@@ -1,0 +1,19 @@
+* Setup
+1. Install Unity
+2. Clone Arcadia: ~cd Assets && git clone https://github.com/arcadia-unity/Arcadia.git~
+3. Clone helper: ~git clone https://github.com/lccambiaghi/hard.git~
+* Notes
+1. Save prefabs in ~Assets/Resources~ in order to ~(clone! :name)~
+2. When adding hooks, use fully qualified names e.g. ~#'game.core/rotate~
+* CIDER problems
+1. Need to lock CIDER to v 0.24, not ideal
+2. How to go to function?
+* Implementation
+1. Create function which spawns all pieces
+   a. Function which spawns one piece
+* Reinforcement Learning
+- AlphaZero in Unity: https://github.com/SSSxCCC/AlphaZero-In-Unity
+- DeepMind paper on AlphaZero: https://arxiv.org/pdf/1712.01815v1.pdf
+- How to model chess RL in ml-agents: https://github.com/Unity-Technologies/ml-agents/issues/152
+- How to model chess game in unity: https://www.raywenderlich.com/5441-how-to-make-a-chess-game-with-unity
+- 3D chess in Unity: https://github.com/SacuL/3D-Chess-Unity
