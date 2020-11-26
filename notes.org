@@ -9,8 +9,52 @@
 1. Need to lock CIDER to v 0.24, not ideal
 2. How to go to function?
 * Implementation
-1. Create function which spawns all pieces
-   a. Function which spawns one piece
+** How to model a chess piece?
+Map?
+#+BEGIN_SRC clojure
+{:type :pawn, :color :white, :row 0, :col 0}
+#+END_SRC
+
+Records?
+#+BEGIN_SRC clojure
+(defprotocol ChessPiece
+  (trajectories [x y]))
+
+(defrecord Pawn [color x y]
+  ChessPiece
+  (trajectories [x y]
+    [{:x x :y (inc y)} {:x x :y (inc (inc y))}]))
+
+(trajectories (map->Pawn {:color "white" :x 1 :y 1}))
+#+END_SRC
+** How to model board?
+Set of pieces?
+** How to model moves?
+Each piece has trajectories it can draw.
+Each piece returns a set of trajectories.
+Each trajectory is a vector of maps, representing cells.
+
+A trajectory is broken by a piece on the way.
+Last (~rest~) cells are filtered out from trajectories.
+
+A player clicks on a piece, the trajectories are computed.
+If it can move to at least one cell, highlight the UI.
+** Hooks
+When player clicks on a piece, we need a hook.
+We get available moves and highlight trajectories.
+
+When player clicks on highlighted cell, we need a hook.
+Move the highlighted piece and potentially destroy the enemy piece.
+
+** Separation between model and view
+An atom (board) stores the game state.
+State is just the pieces on the board and their position.
+
+We have a one-to-one mapping between Clojure map and Unity game objects, given by its ID e.g. white-pawn.
+When user clicks on white-pawn gameobject, we get its Clojure type and query for available moves.
+
+When the player clicks on a destination cell, we update the position of the piece in the Clojure model as well as in the Unity View.
+
 * Reinforcement Learning
 - AlphaZero in Unity: https://github.com/SSSxCCC/AlphaZero-In-Unity
 - DeepMind paper on AlphaZero: https://arxiv.org/pdf/1712.01815v1.pdf
