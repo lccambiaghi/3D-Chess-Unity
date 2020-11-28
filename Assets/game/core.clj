@@ -64,6 +64,7 @@
         go    (clone! piece-name)]
     (child+ board go)
     (move-piece! go x y)
+                                        ; TODO if white, rotate y -90
     (clear-hooks go :update)
     (state+ go :material (.material (cmpt go MeshRenderer)))
     (hook+ go :update :select #'game.core/select)
