@@ -28,7 +28,8 @@ Records?
 (trajectories (map->Pawn {:color "white" :x 1 :y 1}))
 #+END_SRC
 ** How to model board?
-Set of pieces?
+Matrix 8x8.
+Non empty cells have a piece.
 ** How to model moves?
 Each piece has trajectories it can draw.
 Each piece returns a set of trajectories.
