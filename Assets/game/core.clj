@@ -3,7 +3,7 @@
         [arcadia.linear]
         [hard.core]
         [hard.input])
-  (:require [game.data :refer [initial-pos get-pieces-names get-piece-pos]] )
+  (:require [game.data :refer [get-pieces-names get-piece-pos]] )
   (:import
    Physics
    MeshRenderer

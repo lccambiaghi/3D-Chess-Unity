@@ -6,11 +6,13 @@
 ;; TODO: maybe extract a generic function and only parametrize n-cells, directions, etc.?
 
 ;;; pieces
-(defn trajectories [n-cells directions masks]
-  (for [n-cells   (range 1 8)
-        direction [[1 1] [1 -1] [-1 1] [-1 -1]]
-        :let      [offset {direction [(* n-cells (first direction)) (* n-cells (second direction))]}]]
-    (apply merge-with into offset)))
+(defn trajs [n directions]
+  (let [moves              (for [step      (range 1 n)
+                                 direction directions]
+                             {direction [(* step (first direction)) (* step (second direction))]})
+        moves-by-direction (apply merge-with into moves)
+        trajectories       (map (fn [[k v]] (partition 2 v)) moves-by-direction)]
+    trajectories))
 
 (defprotocol ChessPiece
   (trajectories [obj]
@@ -20,73 +22,90 @@
   ChessPiece
   (trajectories [obj]
     "Returns 8 planes (one for each direction)"
-    [[0 1]   ;up
-     [1 1]   ;up right
-     [-1 1]  ;up left
-     [0 -1]  ;down
-     [1 -1]  ;down right
-     [-1 -1] ;down left
-     [1 0]   ;right
-     [-1 0]]))
+    (let [n          2
+          directions [[0 1]             ;up
+                      [1 1]             ;up right
+                      [-1 1]            ;up left
+                      [0 -1]            ;down
+                      [1 -1]            ;down right
+                      [-1 -1]           ;down left
+                      [1 0]             ;right
+                      [-1 0]]]
+      (trajs n directions))))
+
 
 (defrecord Bishop [name color x y]
   ChessPiece
   (trajectories [obj]
     "Returns 7 x 4 planes"
-    (for [n-cells   (range 1 8)
+    (let [n-cells   8
           direction [[1 1] [1 -1] [-1 1] [-1 -1]]
-          :let      [offset {direction [(* n-cells (first direction)) (* n-cells (second direction))]}]]
-      (apply merge-with into offset)
-      )))
+          ]
+      (trajs n-cells direction ))))
 
 (defrecord Knight [name color x y]
   ChessPiece
   (trajectories [obj]
     "Returns 8 planes (one for each L)"
-    [[1 2] ;up right
-     [-1 2] ; up left
-     [1 -2] ; bottom right
-     [-1 -2] ; bottom left
-     [2 1] ; right up
-     [2 -1] ; right down
-     [-2 1] ; left up
-     [-2 -1] ; left down
-     ]))
+    (let [steps      2
+          directions [[1 2]             ;up right
+                      [-1 2]            ; up left
+                      [1 -2]            ; bottom right
+                      [-1 -2]           ; bottom left
+                      [2 1]             ; right up
+                      [2 -1]            ; right down
+                      [-2 1]            ; left up
+                      [-2 -1]           ; left down
+                      ]]
+      (trajs steps directions))
+    ))
 
 (defrecord Rook [name color x y]
   ChessPiece
   (trajectories [obj]
     "Returns 7x4 planes. 1...7(number of cells) x 4(directions)"
-    (for [n-cells   (range 1 8)
-          direction [1 -1]
-          mask      [[0 1][1 0]]
-          :let      [offset [(* (first mask) n-cells direction) (* (second mask) n-cells direction)]]]
-      offset)))
+    (let [steps      8
+          directions [[0 1]             ;up
+                      [0 -1]            ;down
+                      [1 0]             ;right
+                      [-1 0]            ;left
+                      ]]
+      (trajs steps directions))
+    ))
+
 
 (defrecord Pawn [name color x y]
   ChessPiece
   (trajectories [obj]
     "Returns 2 planes (one for each L)"
-    [[0 1] ;up
-     [0 2] ; up up
-     ]))
+    (let [steps      8
+          directions [[0 1] ;up
+                      [0 2] ; up up
+                      ]]
+      (trajs steps directions))))
 
 (defrecord Queen [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 7x8 planes. 1...7(number of cells) x 8(directions)"
-    (for [n-cells   (range 1 8)
-          direction [[1 1] [1 -1] [-1 1] [-1 -1]]
-          mask      [[0 1][1 0]]
-          :let      [offset [(* (first mask) n-cells (first direction)) (* (second mask) n-cells (second direction))]]]
-      offset)))
+ChessPiece
+(trajectories [obj]
+              "Returns 7x8 planes. 1...7(number of cells) x 8(directions)"
+              (let [steps      8
+                    directions [[1 2]             ;up right
+                                [-1 2]            ; up left
+                                [1 -2]            ; bottom right
+                                [-1 -2]           ; bottom left
+                                [2 1]             ; right up
+                                [2 -1]            ; right down
+                                [-2 1]            ; left up
+                                [-2 -1]           ; left down
+                                ]]
+                (trajs steps directions))))
 
 ;;; board
 (def board
   {[4 1] (map->King {:name "wking" :color "white"})
    ;; [3 0] (map->Queen {:name "wqueen" :color "white"})
-   [5 0] (map->Bishop {:name "wbishop" :color "white"})
-   [7 0] (map->Rook {:name "wrook" :color "white"})
+   ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
+   ;; [7 0] (map->Rook {:name "wrook" :color "white"})
    ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
    ;; [6 0] (map->Knight {:name "wknight" :color "white"})
    ;; [3 7] (map->King {:name "bking" :color "black"})
@@ -98,7 +117,11 @@
 (defn get-piece-pos [name]
   (-> (filter (fn [[k v]] (= (:name v) name)) board)
       first
-      key))
+      key
+      ))
+
+                                        ; TODO why do we need first?
+(filter (fn [[k v]] (= (:name v) "wking")) board)
 
 (defn move-piece [[x y] [x-offset y-offset]]
   [(+ x x-offset) (+ y y-offset)])
@@ -111,18 +134,20 @@ Taken trajectories, find the first occupied cell in the trajectory and only keep
        (>= y 0) (< y size))
   )
 
-(defn get-piece-moves [name]
-  (let [[pos piece]  (first (filter (fn [[k v]] (= (:name v) name)) board))
-        trajectories (trajectories piece)
-        moves        (map (partial move-piece pos) trajectories)
-        legal-moves  (filter legal-move? moves)]
-    legal-moves
-    ))
+;; (defn get-piece-moves [name]
+;;   (let [[pos piece]  (first (filter (fn [[k v]] (= (:name v) name)) board))
+;;         trajectories (trajectories piece)
+;;         moves        (map (partial move-piece pos) trajectories)
+;;         legal-moves  (filter legal-move? moves)]
+;;     legal-moves
+;;     ))
 
 
 (comment
   (get-piece-pos "wking")
   (partition-by first (sort-by first (get-piece-moves "wrook")))
+
+  (trajectories (map->Bishop {:name "wbishop" :color "white"}))
 
   (group-by second (get-piece-moves "wrook"))
 
