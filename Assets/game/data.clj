@@ -22,7 +22,7 @@
   ChessPiece
   (trajectories [obj]
     "Returns 8 planes (one for each direction)"
-    (let [n          2
+    (let [n          2 ; TODO change steps to be 1 and 7 and put +1 in trajs
           directions [[0 1]             ;up
                       [1 1]             ;up right
                       [-1 1]            ;up left
@@ -85,63 +85,120 @@
       (trajs steps directions))))
 
 (defrecord Queen [name color x y]
-ChessPiece
-(trajectories [obj]
-              "Returns 7x8 planes. 1...7(number of cells) x 8(directions)"
-              (let [steps      8
-                    directions [[1 2]             ;up right
-                                [-1 2]            ; up left
-                                [1 -2]            ; bottom right
-                                [-1 -2]           ; bottom left
-                                [2 1]             ; right up
-                                [2 -1]            ; right down
-                                [-2 1]            ; left up
-                                [-2 -1]           ; left down
-                                ]]
-                (trajs steps directions))))
+  ChessPiece
+  (trajectories [obj]
+    "Returns 7x8 planes. 1...7(number of cells) x 8(directions)"
+    (let [steps      8
+          directions [[1 2]             ;up right
+                      [-1 2]            ; up left
+                      [1 -2]            ; bottom right
+                      [-1 -2]           ; bottom left
+                      [2 1]             ; right up
+                      [2 -1]            ; right down
+                      [-2 1]            ; left up
+                      [-2 -1]           ; left down
+                      ]]
+      (trajs steps directions))))
 
 ;;; board
 (def board
-  {[4 1] (map->King {:name "wking" :color "white"})
-   ;; [3 0] (map->Queen {:name "wqueen" :color "white"})
-   ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
-   ;; [7 0] (map->Rook {:name "wrook" :color "white"})
-   ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
-   ;; [6 0] (map->Knight {:name "wknight" :color "white"})
-   ;; [3 7] (map->King {:name "bking" :color "black"})
-   })
+  (atom
+   {[4 1] (map->King {:name "wking" :color "white"})
+    ;; [3 0] (map->Queen {:name "wqueen" :color "white"})
+    [5 0] (map->Bishop {:name "wbishop" :color "white"})
+    [7 2] (map->Pawn {:name "bpawn" :color "black"})
+    ;; [7 0] (map->Rook {:name "wrook" :color "white"})
+    ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
+    ;; [6 0] (map->Knight {:name "wknight" :color "white"})
+    ;; [3 7] (map->King {:name "bking" :color "black"})
+    }))
 
 (defn get-pieces-names []
-  (map :name (vals board)))
+  (map :name (vals @board)))
+
+(defn get-piece-map [name]
+  (first (filter (fn [[k v]] (= (:name v) name)) @board))) ; TODO why do we need first?
+
+(defn get-piece [name]
+  (val (get-piece-map name)))
 
 (defn get-piece-pos [name]
-  (-> (filter (fn [[k v]] (= (:name v) name)) board)
-      first
-      key
-      ))
+  (key (get-piece-map name)))
 
-                                        ; TODO why do we need first?
-(filter (fn [[k v]] (= (:name v) "wking")) board)
+(defn get-piece-color [name]
+  (:color (get-piece name)))
 
-(defn move-piece [[x y] [x-offset y-offset]]
+#_(get-piece-pos "wbishop")
+#_(get-piece-color "wking")
+#_(get-piece "wking")
+
+(defn abs [x]
+  (if (> x 0) x (* -1 x)))
+
+(defn legal-cell? [[x y]]
+  (and (not (contains? @board [x y]))
+       (>= x  0) (< x  size)
+       (>= y 0) (< y size)))
+
+(defn capture? [color cell]
+  (let [cell-color (:color (get @board cell))]
+    (and (some? cell-color) (not= color cell-color))))
+
+(defn legal-move? [color cell]
+  (let [cell-color (:color (get @board cell))
+        capture?   (and (some? cell-color) (not= color cell-color))
+        legal?     (and (not (contains? @board cell))
+                        (>= (first cell)  0) (< (first cell)  size)
+                        (>= (second cell) 0) (< (second cell) size))]
+    (or legal? capture?)))
+
+
+
+(defn filter-traj [color traj]
+  "Trajectory is a sequence of moves in the same direction.
+We first sort it and then 'cut' it when it goes off the baord or hits a piece."
+  (let [traj-sorted (sort-by #(+ (abs (first %)) (abs (second %))) traj)
+        traj-legal  (take-while #(or (legal-cell? %) (capture? color %)) traj-sorted)]
+    traj-legal))
+
+;; (filter-traj "white" [[7 3]])
+
+(defn add-xy [[x y] [x-offset y-offset]]
   [(+ x x-offset) (+ y y-offset)])
 
-(defn legal-move? [[x y]]
-  "Legal if cell is not occupied and cell is in the board.
-Taken trajectories, find the first occupied cell in the trajectory and only keep those"
-  (and (not (contains? board [x y]))
-       (>= x 0) (< x size)
-       (>= y 0) (< y size))
-  )
+(defn get-piece-moves [name]
+  (let [[pos piece] (get-piece-map name)
+        color       (:color piece)
+        trajs       (trajectories piece)
+        piece-trajs (map (fn [traj] (map (partial add-xy pos) traj)) trajs)
+        legal-moves (map (partial filter-traj color) piece-trajs)]
+    (apply concat legal-moves)))
 
-;; (defn get-piece-moves [name]
-;;   (let [[pos piece]  (first (filter (fn [[k v]] (= (:name v) name)) board))
-;;         trajectories (trajectories piece)
-;;         moves        (map (partial move-piece pos) trajectories)
-;;         legal-moves  (filter legal-move? moves)]
-;;     legal-moves
-;;     ))
+(defn is-legal-move? [name cell]
+  (let [legal-moves (get-piece-moves name)]
+    (some #(= cell %) legal-moves)))
 
+#_(is-legal-move? "wbishop" [5 0])
+
+(defn update-board! [name new-pos]
+  (let [[previous-pos piece] (get-piece-map name)]
+    (swap! board dissoc previous-pos)
+    (swap! board assoc new-pos piece)))
+
+(defn is-piece-selected? [name]
+  (let [piece (get-piece name)]
+    (get piece :selected)))
+
+(defn any-piece-selected? []
+  (reduce (fn [res [pos piece]] (or res (get piece :selected))) false @board))
+
+(defn board-select! [name]
+  (let [[pos piece] (get-piece-map name)]
+    (swap! board assoc pos (assoc piece :selected true))))
+
+(defn board-unselect! [name]
+  (let [[pos piece] (get-piece-map name)]
+    (swap! board assoc pos (dissoc piece :selected))))
 
 (comment
   (get-piece-pos "wking")
@@ -151,10 +208,15 @@ Taken trajectories, find the first occupied cell in the trajectory and only keep
 
   (group-by second (get-piece-moves "wrook"))
 
-  (group-by #(+ (first %) (second %)) (get-piece-moves "wbishop"))
+  (count (get-piece-moves "wbishop"))
 
 
   (count (trajectories (map->Queen {:name "wqueen" :color "white"})))
+
+  (let [a [[1 4] [1 2] [1 3]]
+        b [[2 -2] [1 -1] [3 -3]]
+        c [[-1 1] [-2 2] [-3 3]]]
+    (sort-by #(+ (abs (first %)) (abs (second %))) c))
 
   ;;; matrix
   (nth (repeat size (repeat size 0)) 2)
