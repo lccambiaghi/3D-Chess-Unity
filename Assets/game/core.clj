@@ -4,7 +4,8 @@
         [hard.core]
         [hard.input])
   (:require [game.data :refer [get-pieces-names get-piece-pos get-piece-color get-piece-moves is-legal-move?
-                               update-board! board-select! board-unselect! is-piece-selected? any-piece-selected?]] :reload)
+                               update-board! board-select! board-unselect! is-piece-selected? any-piece-selected?
+                               does-piece-capture? get-piece-at-pos]] :reload)
   (:import
    Physics
    MeshRenderer
@@ -17,10 +18,9 @@
   (when-first [mouse-hit (ray-hits (mouse-ray))]
     (let [x (int (.. mouse-hit point x))
           y (int (.. mouse-hit point z))]
-      #_(log "pointing at " x " and " y)
       [x y])))
 
-(defn highlight! [go]
+(defn highlight-piece! [go]
   ;; if selected, change material
   (let [texture (.mainTexture (.material (cmpt go MeshRenderer)))]
     (set! (.mainTexture (resource "highlight")) texture)
@@ -43,39 +43,57 @@
   (destroy! (every "highcell")))
 #_(destroy-highcells!)
 
-(defn select [go _]
+(defn select-piece! [go _]
   (when (mouse-down?)
     (let [[mouse-x mouse-y] (mouse-position)
           go-x              (int (.x (.position (.transform go))))
           go-y              (int (.z (.position (.transform go))))]
       (when (and (= mouse-x go-x) (= mouse-y go-y) (not (any-piece-selected?)))
         (highlight-cells! go)
-        (highlight! go)
+        (highlight-piece! go)
         (board-select! (.name go))
         ))))
 
+(defn unselect-piece! [go _]
+  (when (and (mouse-down? 1) (is-piece-selected? (.name go)))
+    (hide-highlight! go)
+    (destroy-highcells!)
+    (board-unselect! (.name go))
+    ))
+
+;; (board-unselect! "wbishop")
+;; (is-piece-selected? "wbishop")
 
 ;;; move
 (defn move-go! [go x y]
   (position! go (v3 (+ x offset) 0 (+ y offset))))
 
-(defn move [go _]
+(defn piece-position [go]
+  [(int (.x (.position (.transform go))))
+   (int (.z (.position (.transform go))))])
+
+(defn move-piece! [go _]
   (when (and (mouse-down?) (is-piece-selected? (.name go)))
-    (let [[mouse-x mouse-y] (mouse-position)]
-      (when (game.data/is-legal-move? (.name go) [mouse-x mouse-y])
-        (update-board! (.name go) [mouse-x mouse-y])
+    (let [[mouse-x mouse-y] (mouse-position)
+          name              (.name go)]
+      (when (game.data/is-legal-move? name [mouse-x mouse-y])
+        (when (game.data/does-piece-capture? name [mouse-x mouse-y])
+          (destroy! (object-named (get-piece-at-pos [mouse-x mouse-y]))))
+        (update-board! name [mouse-x mouse-y])
         (move-go! go mouse-x mouse-y)
         (hide-highlight! go)
         (destroy-highcells!)
-        (board-unselect! (.name go))
+        (board-unselect! name)
         ))))
+
+#_(destroy! (object-named (get-piece-at-pos (mouse-position))))
 
 #_(game.data/is-legal-move? "wbishop" (mouse-position))
 
 #_(hook (the "wbishop") :update :move)
 
 ;;; spawn
-(defn spawn! [board piece-name]
+(defn spawn-piece! [board piece-name]
   (let [[x y] (get-piece-pos piece-name)
         go    (clone! piece-name)]
     (child+ board go)
@@ -83,8 +101,9 @@
                                         ; TODO if white, rotate y -90
     (clear-hooks go :update)
     (state+ go :material (.material (cmpt go MeshRenderer)))
-    (hook+ go :update :select #'game.core/select)
-    (hook+ go :update :move #'game.core/move)
+    (hook+ go :update :select #'game.core/select-piece!)
+    (hook+ go :update :unselect #'game.core/unselect-piece!)
+    (hook+ go :update :move #'game.core/move-piece!)
     ))
 
 
@@ -94,7 +113,7 @@
   (clone! :light)
   (let [board (clone! :board)]
     (for [piece-name (get-pieces-names)]
-      (spawn! board piece-name))
+      (spawn-piece! board piece-name))
     ))
 
 (start-game nil)

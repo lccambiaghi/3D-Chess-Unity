@@ -1,9 +1,7 @@
-(ns game.data)
+(ns game.data
+  (:require [arcadia.core :refer [log]]))
 
 (def size 8)
-
-;; TODO: in get-legal-moves, it is now easy to filter away the invalid part of each trajectory by sorting
-;; TODO: maybe extract a generic function and only parametrize n-cells, directions, etc.?
 
 ;;; pieces
 (defn trajs [n directions]
@@ -47,7 +45,7 @@
   ChessPiece
   (trajectories [obj]
     "Returns 8 planes (one for each L)"
-    (let [steps      2
+    (let [steps      3
           directions [[1 2]             ;up right
                       [-1 2]            ; up left
                       [1 -2]            ; bottom right
@@ -78,9 +76,11 @@
   ChessPiece
   (trajectories [obj]
     "Returns 2 planes (one for each L)"
-    (let [steps      8
-          directions [[0 1] ;up
-                      [0 2] ; up up
+    (let [steps      2
+          directions [[0 (if (= (:color obj) "white") 1 -1)]        ; forward
+                      [0 (if (= (:color obj) "white") 2 -2)]        ; double forward
+                      [1 (if (= (:color obj) "white") 1 -1)]        ; diag right
+                      [-1 (if (= (:color obj) "white") 1 -1)]        ; diag left
                       ]]
       (trajs steps directions))))
 
@@ -125,53 +125,58 @@
 (defn get-piece-pos [name]
   (key (get-piece-map name)))
 
+(defn get-piece-at-pos [pos]
+  (:name (get @board pos)))
+
 (defn get-piece-color [name]
   (:color (get-piece name)))
 
-#_(get-piece-pos "wbishop")
-#_(get-piece-color "wking")
-#_(get-piece "wking")
 
 (defn abs [x]
   (if (> x 0) x (* -1 x)))
 
-(defn legal-cell? [[x y]]
+;; TODO a bit inefficient maybe?
+(defn legal-pawn-move? [name cell]
+  (let [[x y]        (get-piece-pos name)
+        is-pawn?     (re-find #"pawn" name)
+        is-vertical? (= x (first cell))]
+    (if is-pawn? is-vertical? true)))
+
+#_(legal-pawn-move? "bpawn" [6 1])
+
+(defn legal-cell? [name [x y]]
   (and (not (contains? @board [x y]))
        (>= x  0) (< x  size)
-       (>= y 0) (< y size)))
+       (>= y 0) (< y size)
+       (legal-pawn-move? name [x y])))
 
-(defn capture? [color cell]
+(defn is-enemy-cell? [color cell]
   (let [cell-color (:color (get @board cell))]
     (and (some? cell-color) (not= color cell-color))))
 
-(defn legal-move? [color cell]
-  (let [cell-color (:color (get @board cell))
-        capture?   (and (some? cell-color) (not= color cell-color))
-        legal?     (and (not (contains? @board cell))
-                        (>= (first cell)  0) (< (first cell)  size)
-                        (>= (second cell) 0) (< (second cell) size))]
-    (or legal? capture?)))
 
+;; TODO pawn en-passant
+(defn does-piece-capture? [name cell]
+  (let [piece-color (get-piece-color name)]
+    (is-enemy-cell? piece-color cell)))
 
-
-(defn filter-traj [color traj]
+(defn get-legal-moves [name traj]
   "Trajectory is a sequence of moves in the same direction.
-We first sort it and then 'cut' it when it goes off the baord or hits a piece."
+We first sort it and then 'cut' it when it goes off the board or hits a piece."
   (let [traj-sorted (sort-by #(+ (abs (first %)) (abs (second %))) traj)
-        traj-legal  (take-while #(or (legal-cell? %) (capture? color %)) traj-sorted)]
+        traj-legal  (take-while #(or (legal-cell? name %) (does-piece-capture? name %)) traj-sorted)]
     traj-legal))
 
-;; (filter-traj "white" [[7 3]])
+;; (get-legal-moves "white" [[7 3]])
 
 (defn add-xy [[x y] [x-offset y-offset]]
   [(+ x x-offset) (+ y y-offset)])
 
 (defn get-piece-moves [name]
   (let [[pos piece] (get-piece-map name)
-        color       (:color piece)
         trajs       (trajectories piece)
         piece-trajs (map (fn [traj] (map (partial add-xy pos) traj)) trajs)
-        legal-moves (map (partial filter-traj color) piece-trajs)]
+        legal-moves (map (partial get-legal-moves name) piece-trajs)]
     (apply concat legal-moves)))
 
 (defn is-legal-move? [name cell]
@@ -200,35 +205,3 @@ We first sort it and then 'cut' it when it goes off the baord or hits a piece."
   (let [[pos piece] (get-piece-map name)]
     (swap! board assoc pos (dissoc piece :selected))))
 
-(comment
-  (get-piece-pos "wking")
-  (partition-by first (sort-by first (get-piece-moves "wrook")))
-
-  (trajectories (map->Bishop {:name "wbishop" :color "white"}))
-
-  (group-by second (get-piece-moves "wrook"))
-
-  (count (get-piece-moves "wbishop"))
-
-
-  (count (trajectories (map->Queen {:name "wqueen" :color "white"})))
-
-  (let [a [[1 4] [1 2] [1 3]]
-        b [[2 -2] [1 -1] [3 -3]]
-        c [[-1 1] [-2 2] [-3 3]]]
-    (sort-by #(+ (abs (first %)) (abs (second %))) c))
-
-  ;;; matrix
-  (nth (repeat size (repeat size 0)) 2)
-
-  (def matrix
-    [[1 2 3]
-     [4 5 6]
-     [7 8 9]])
-
-  (get-in matrix [1 2])
-
-  (assoc-in matrix [1 2] 'x)
-
-  (subvec matrix 0 2)
-  )
