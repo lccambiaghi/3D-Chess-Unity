@@ -5,7 +5,7 @@
         [hard.input])
   (:require [game.data :refer [get-pieces-names get-piece-pos get-piece-color get-piece-moves is-legal-move?
                                update-board! board-select! board-unselect! is-piece-selected? any-piece-selected?
-                               does-piece-capture? get-piece-at-pos]] :reload)
+                               does-piece-capture? get-piece-at-pos is-pieces-turn? update-board-turn!]] :reload)
   (:import
    Physics
    MeshRenderer
@@ -44,7 +44,7 @@
 #_(destroy-highcells!)
 
 (defn select-piece! [go _]
-  (when (mouse-down?)
+  (when (and (mouse-down?) (is-pieces-turn? (.name go)))
     (let [[mouse-x mouse-y] (mouse-position)
           go-x              (int (.x (.position (.transform go))))
           go-y              (int (.z (.position (.transform go))))]
@@ -68,7 +68,7 @@
 (defn move-go! [go x y]
   (position! go (v3 (+ x offset) 0 (+ y offset))))
 
-(defn piece-position [go]
+(defn go-position [go]
   [(int (.x (.position (.transform go))))
    (int (.z (.position (.transform go))))])
 
@@ -84,6 +84,7 @@
         (hide-highlight! go)
         (destroy-highcells!)
         (board-unselect! name)
+        (update-board-turn!)
         ))))
 
 #_(destroy! (object-named (get-piece-at-pos (mouse-position))))

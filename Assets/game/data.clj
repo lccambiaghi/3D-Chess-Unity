@@ -4,6 +4,20 @@
 (def size 8)
 
 ;;; pieces
+;; (defmulti trajectories (fn [piece] (:type piece)))
+;; (defmethod trajectories :king
+;;   [piece]
+;;   (let [n          2 ; TODO change steps to be 1 and 7 and put +1 in trajs
+;;         directions [[0 1]             ;up
+;;                     [1 1]             ;up right
+;;                     [-1 1]            ;up left
+;;                     [0 -1]            ;down
+;;                     [1 -1]            ;down right
+;;                     [-1 -1]           ;down left
+;;                     [1 0]             ;right
+;;                     [-1 0]]]
+;;     (trajs n directions)))
+
 (defn trajs [n directions]
   (let [moves              (for [step      (range 1 n)
                                  direction directions]
@@ -106,15 +120,16 @@
    {[4 1] (map->King {:name "wking" :color "white"})
     ;; [3 0] (map->Queen {:name "wqueen" :color "white"})
     [5 0] (map->Bishop {:name "wbishop" :color "white"})
-    [7 2] (map->Pawn {:name "bpawn" :color "black"})
+    [6 6] (map->Pawn {:name "bpawn" :color "black"})
     ;; [7 0] (map->Rook {:name "wrook" :color "white"})
     ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
     ;; [6 0] (map->Knight {:name "wknight" :color "white"})
     ;; [3 7] (map->King {:name "bking" :color "black"})
+    :turn "white"
     }))
 
 (defn get-pieces-names []
-  (map :name (vals @board)))
+  (map :name (vals (dissoc @board :turn))))
 
 (defn get-piece-map [name]
   (first (filter (fn [[k v]] (= (:name v) name)) @board))) ; TODO why do we need first?
@@ -131,16 +146,27 @@
 (defn get-piece-color [name]
   (:color (get-piece name)))
 
+(defn is-pieces-turn? [name]
+  (= (get-piece-color name) (:turn @board)))
+
+(defn is-piece-selected? [name]
+  (let [piece (get-piece name)]
+    (get piece :selected)))
 
 (defn abs [x]
   (if (> x 0) x (* -1 x)))
 
-;; TODO a bit inefficient maybe?
-(defn legal-pawn-move? [name cell]
-  (let [[x y]        (get-piece-pos name)
-        is-pawn?     (re-find #"pawn" name)
-        is-vertical? (= x (first cell))]
-    (if is-pawn? is-vertical? true)))
+(defn legal-pawn-move? [name [to-x to-y]]
+  "Pawns can only move vertically. It can move by 2 if it is in initial position"
+  (if (re-find #"pawn" name)
+    (let [[from-x from-y]      (get-piece-pos name)
+          color                (get-piece-color name)
+          is-vertical?         (= from-x to-x)
+          advances-two?        (= (abs (- to-y from-y)) 2)
+          is-pawn-initial-pos? (if (= color "white") (= from-y 1) (= from-y 6))
+          is-legal-vertical?   (if advances-two? is-pawn-initial-pos? true)]
+      (and is-vertical? is-legal-vertical?))
+    true))
 
 #_(legal-pawn-move? "bpawn" [6 1])
 
@@ -185,15 +211,6 @@ We first sort it and then 'cut' it when it goes off the board or hits a piece."
 
 #_(is-legal-move? "wbishop" [5 0])
 
-(defn update-board! [name new-pos]
-  (let [[previous-pos piece] (get-piece-map name)]
-    (swap! board dissoc previous-pos)
-    (swap! board assoc new-pos piece)))
-
-(defn is-piece-selected? [name]
-  (let [piece (get-piece name)]
-    (get piece :selected)))
-
 (defn any-piece-selected? []
   (reduce (fn [res [pos piece]] (or res (get piece :selected))) false @board))
 
@@ -205,3 +222,14 @@ We first sort it and then 'cut' it when it goes off the board or hits a piece."
   (let [[pos piece] (get-piece-map name)]
     (swap! board assoc pos (dissoc piece :selected))))
 
+(defn update-board! [name new-pos]
+  (let [[previous-pos piece] (get-piece-map name)]
+    (swap! board dissoc previous-pos)
+    (swap! board assoc new-pos piece)))
+
+(defn update-board-turn! []
+  (let [new-color (if (= (:turn @board) "white") "black" "white")]
+    (swap! board assoc :turn new-color)))
+
+#_(update-board-turn!)
+;; (:turn @board)
