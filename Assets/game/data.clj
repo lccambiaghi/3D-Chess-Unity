@@ -7,19 +7,6 @@
 ;; TODO multimethod to get legal moves? default is current legal-move, more conditions for pawn and king
 
 ;;; pieces
-;; (defmulti trajectories (fn [piece] (:type piece)))
-;; (defmethod trajectories :king
-;;   [piece]
-;;   (let [n          2 ; TODO change steps to be 1 and 7 and put +1 in trajs
-;;         directions [[0 1]             ;up
-;;                     [1 1]             ;up right
-;;                     [-1 1]            ;up left
-;;                     [0 -1]            ;down
-;;                     [1 -1]            ;down right
-;;                     [-1 -1]           ;down left
-;;                     [1 0]             ;right
-;;                     [-1 0]]]
-;;     (trajs n directions)))
 
 (defn trajs [n directions]
   (let [moves              (for [step      (range 1 n)
@@ -29,108 +16,89 @@
         trajectories       (map (fn [[k v]] (partition 2 v)) moves-by-direction)]
     trajectories))
 
-(defprotocol ChessPiece
-  (trajectories [obj]
-    "trajectories returns a map indexed by direction of trajectories"))
+(defmulti trajectories (fn [piece] (:type piece)))
 
-(defrecord King [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 8 planes (one for each direction)"
-    (let [n          2 ; TODO change steps to be 1 and 7 and put +1 in trajs
-          directions [[0 1]             ;up
-                      [1 1]             ;up right
-                      [-1 1]            ;up left
-                      [0 -1]            ;down
-                      [1 -1]            ;down right
-                      [-1 -1]           ;down left
-                      [1 0]             ;right
-                      [-1 0]]]
-      (trajs n directions))))
+(defmethod trajectories "king"
+  [piece]
+  (let [n          2 ; TODO change steps to be 1 and 7 and put +1 in trajs
+        directions [[0 1]             ;up
+                    [1 1]             ;up right
+                    [-1 1]            ;up left
+                    [0 -1]            ;down
+                    [1 -1]            ;down right
+                    [-1 -1]           ;down left
+                    [1 0]             ;right
+                    [-1 0]]]
+    (trajs n directions)))
 
+(defmethod trajectories "bishop"
+  [piece]
+  (let [n-cells   8
+        direction [[1 1] [1 -1] [-1 1] [-1 -1]]]
+    (trajs n-cells direction)))
 
-(defrecord Bishop [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 7 x 4 planes"
-    (let [n-cells   8
-          direction [[1 1] [1 -1] [-1 1] [-1 -1]]
-          ]
-      (trajs n-cells direction ))))
+(defmethod trajectories "pawn"
+  [piece]
+  (let [steps      2
+        directions [[0 (if (= (:color piece) "white") 1 -1)]        ; forward
+                    [0 (if (= (:color piece) "white") 2 -2)]        ; double forward
+                    [1 (if (= (:color piece) "white") 1 -1)]        ; diag right
+                    [-1 (if (= (:color piece) "white") 1 -1)]        ; diag left
+                    ]]
+    (trajs steps directions)))
 
-(defrecord Knight [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 8 planes (one for each L)"
-    (let [steps      3
-          directions [[1 2]             ;up right
-                      [-1 2]            ; up left
-                      [1 -2]            ; bottom right
-                      [-1 -2]           ; bottom left
-                      [2 1]             ; right up
-                      [2 -1]            ; right down
-                      [-2 1]            ; left up
-                      [-2 -1]           ; left down
-                      ]]
-      (trajs steps directions))
-    ))
+(defmethod trajectories "knight"
+  [piece]
+  (let [steps      3
+        directions [[1 2]             ;up right
+                    [-1 2]            ; up left
+                    [1 -2]            ; bottom right
+                    [-1 -2]           ; bottom left
+                    [2 1]             ; right up
+                    [2 -1]            ; right down
+                    [-2 1]            ; left up
+                    [-2 -1]           ; left down
+                    ]]
+    (trajs steps directions)))
 
-(defrecord Rook [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 7x4 planes. 1...7(number of cells) x 4(directions)"
-    (let [steps      8
-          directions [[0 1]             ;up
-                      [0 -1]            ;down
-                      [1 0]             ;right
-                      [-1 0]            ;left
-                      ]]
-      (trajs steps directions))
-    ))
+(defmethod trajectories "rook"
+  [piece]
+  (let [steps      8
+        directions [[0 1]             ;up
+                    [0 -1]            ;down
+                    [1 0]             ;right
+                    [-1 0]            ;left
+                    ]]
+    (trajs steps directions)))
 
-
-(defrecord Pawn [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 2 planes (one for each L)"
-    (let [steps      2
-          directions [[0 (if (= (:color obj) "white") 1 -1)]        ; forward
-                      [0 (if (= (:color obj) "white") 2 -2)]        ; double forward
-                      [1 (if (= (:color obj) "white") 1 -1)]        ; diag right
-                      [-1 (if (= (:color obj) "white") 1 -1)]        ; diag left
-                      ]]
-      (trajs steps directions))))
-
-(defrecord Queen [name color x y]
-  ChessPiece
-  (trajectories [obj]
-    "Returns 7x8 planes. 1...7(number of cells) x 8(directions)"
-    (let [steps      8
-          directions [[1 2]             ;up right
-                      [-1 2]            ; up left
-                      [1 -2]            ; bottom right
-                      [-1 -2]           ; bottom left
-                      [2 1]             ; right up
-                      [2 -1]            ; right down
-                      [-2 1]            ; left up
-                      [-2 -1]           ; left down
-                      ]]
-      (trajs steps directions))))
+(defmethod trajectories "queen"
+  [piece]
+  (let [steps      8
+        directions [[1 2]             ;up right
+                    [-1 2]            ; up left
+                    [1 -2]            ; bottom right
+                    [-1 -2]           ; bottom left
+                    [2 1]             ; right up
+                    [2 -1]            ; right down
+                    [-2 1]            ; left up
+                    [-2 -1]           ; left down
+                    ]]
+    (trajs steps directions)))
 
 ;;; board
 (def board
   (atom
    {:turn "white"
     ;; white pieces
-    [4 1] (map->King {:name "wking" :color "white"})
+    [4 1] {:name "wking" :color "white" :type "king"}
     ;; [3 0] (map->Queen {:name "wqueen" :color "white"})
-    [5 0] (map->Bishop {:name "wbishop" :color "white"})
-    [6 6] (map->Pawn {:name "bpawn" :color "black"})
+    [5 0] {:name "wbishop" :color "white" :type "bishop"}
+    [6 6] {:name "bpawn" :color "black" :type "pawn"}
     ;; [7 0] (map->Rook {:name "wrook" :color "white"})
     ;; [5 0] (map->Bishop {:name "wbishop" :color "white"})
     ;; [6 0] (map->Knight {:name "wknight" :color "white"})
     ;; black pieces
-    [3 7] (map->King {:name "bking" :color "black"})
+    [3 7] {:name "bking" :color "black" :type "king"}
     }))
 
 (defn get-pieces-names
@@ -196,11 +164,14 @@
   (let [piece-color (get-piece-color name)]
     (is-enemy-cell? piece-color cell)))
 
+(defn is-possible-move? [name cell]
+  (or (is-legal-move? name cell) (does-piece-capture? name cell)))
+
 (defn get-legal-moves [name traj]
   "Trajectory is a sequence of moves in the same direction.
 We first sort it and then 'cut' it when it goes off the board or hits a piece."
   (let [moves       (sort-by #(+ (abs (first %)) (abs (second %))) traj)
-        legal-moves (take-while #(or (is-legal-move? name %) (does-piece-capture? name %)) moves)]
+        legal-moves (take-while (fn [move] (is-possible-move? name move)) moves)]
     legal-moves))
 
 ;; (get-legal-moves "white" [[7 3]])
@@ -215,6 +186,7 @@ We first sort it and then 'cut' it when it goes off the board or hits a piece."
         legal-moves (map (partial get-legal-moves name) piece-trajs)]
     (apply concat legal-moves)))
 
+(trajectories (get-piece "wking"))
 ;; check, checkmate
 
 (defn is-check?

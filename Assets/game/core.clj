@@ -3,7 +3,7 @@
         [arcadia.linear]
         [hard.core]
         [hard.input])
-  (:require [game.data :refer [get-pieces-names get-piece-pos get-piece-color get-piece-moves is-legal-move?
+  (:require [game.data :refer [get-pieces-names get-piece-pos get-piece-color get-piece-moves is-possible-move?
                                update-board! board-select! board-unselect! is-piece-selected? any-piece-selected?
                                does-piece-capture? get-piece-at-pos is-pieces-turn? update-board-turn!]] :reload)
   (:import
@@ -76,7 +76,7 @@
   (when (and (mouse-down?) (is-piece-selected? (.name go)))
     (let [[mouse-x mouse-y] (mouse-position)
           name              (.name go)]
-      (when (game.data/is-legal-move? name [mouse-x mouse-y])
+      (when (game.data/is-possible-move? name [mouse-x mouse-y])
         (when (game.data/does-piece-capture? name [mouse-x mouse-y])
           (destroy! (object-named (get-piece-at-pos [mouse-x mouse-y]))))
         (update-board! name [mouse-x mouse-y])
