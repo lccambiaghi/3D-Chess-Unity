@@ -57,11 +57,11 @@ When user clicks on white-pawn gameobject, we get its Clojure type and query for
 When the player clicks on a destination cell, we update the position of the piece in the Clojure model as well as in the Unity View.
 
 ** TODO missing
-- turn
+- turn √
 - end of game
 - castling
 - empassant
-- pawn should capture to the side
+- pawn should capture to the side √
 - promotion
 * Reinforcement Learning
 - AlphaZero in Unity: https://github.com/SSSxCCC/AlphaZero-In-Unity

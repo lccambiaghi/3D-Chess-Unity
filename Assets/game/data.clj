@@ -151,14 +151,12 @@
   (if (> x 0) x (* -1 x)))
 
 (defn legal-pawn-move? [name [to-x to-y]]
-  "Pawns can only move vertically. It can move by 2 if it is in initial position"
+  "Pawns can only move by 2 if it is in initial position"
   (let [[from-x from-y]      (get-piece-pos name)
         color                (get-piece-color name)
-        is-vertical?         (= from-x to-x)
         advances-two?        (= (abs (- to-y from-y)) 2)
-        is-pawn-initial-pos? (if (= color "white") (= from-y 1) (= from-y 6))
-        is-legal-vertical?   (if advances-two? is-pawn-initial-pos? true)]
-    (and is-vertical? is-legal-vertical?)))
+        is-pawn-initial-pos? (if (= color "white") (= from-y 1) (= from-y 6))]
+    (if advances-two? is-pawn-initial-pos? true)))
 
 (declare is-check?)
 
@@ -168,12 +166,14 @@
       (not (is-check? color move))
       true)))
 
-#_(legal-pawn-move? "bpawn" [6 1])
+;; (is-check? "white" move)
 
+#_(legal-pawn-move? "bpawn" [6 1])
+;; (is-legal-move? "wbishop" [6 1])
 
 (defn is-legal-move? [name [x y]]
   (and (not (contains? @board [x y]))
-       (>= x  0) (< x  size)
+       (>= x 0) (< x  size)
        (>= y 0) (< y size)
        (if (re-find #"pawn" name) (legal-pawn-move? name [x y]) true)
        (if (re-find #"king" name) (legal-king-move? name [x y]) true)
@@ -188,14 +188,14 @@
   (let [piece-color (get-piece-color name)]
     (is-enemy-cell? piece-color cell)))
 
-(defn cut-moves [name traj]
-  "Moves is empty cells the piece can move to. A sequence of legal moves"
-  (let [moves       (sort-by #(+ (abs (first %)) (abs (second %))) traj)
-        legal-moves (take-while (fn [move] (is-legal-move? name move)) moves)]
-    legal-moves))
+(defn cut-traj [name traj]
+  "Keep the first part of the trajectory until we hit a piece."
+  (take-while (fn [move] (is-legal-move? name move)) traj))
+
+;; (trajectories (get-piece "wbishop"))
 
 (defn cut-captures [name traj]
-  "Here we see if we capture an enemy in this trajectory"
+  "Returns first enemy captured in trajectory"
   (let [moves    (sort-by #(+ (abs (first %)) (abs (second %))) traj)
         captures (filter (fn [move] (does-piece-capture? name move)) moves)]
     (if (empty? captures) '() (first captures))))
@@ -206,33 +206,36 @@
 (defn flt [s] (mapcat #(if (every? coll? %) (flt %) (list %)) s))
 
 (defn get-piece-moves [name]
-  (let [[pos piece] (get-piece-map name)
-        piece-trajs (map (fn [traj] (map (partial add-xy pos) traj)) (trajectories piece))
-        piece-capts (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
-        legal-moves (map (partial cut-moves name) piece-trajs)
-        captures    (map (partial cut-captures name) piece-capts)]
-    (concat (flt legal-moves) (flt captures))
-    ;; legal-moves
-    )) ;; remove empty trajectories
+  (let [[pos piece]    (get-piece-map name)
+        maybe-moves    (map (fn [traj] (map (partial add-xy pos) traj)) (trajectories piece))
+        legal-moves    (map (partial cut-traj name) maybe-moves)
+        maybe-captures (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
+        legal-captures (map (partial cut-captures name) maybe-captures)]
+    (concat (flt legal-moves) (flt legal-captures))))
 
-;; (get-piece-moves "bking")
+;; (get-piece-moves "wbishop")
 ;; (trajectories (get-piece "wking"))
 ;; (captures (get-piece "wking"))
 
-
 ;; check, checkmate
+
+(defn threathened-cells [name]
+  (let [[pos piece]    (get-piece-map name)
+        maybe-captures (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
+        legal-captures (map (partial cut-traj name) maybe-captures)]
+    legal-captures))
+
+;; (threathened-cells "wbishop")
 
 (defn is-check?
   ([] (let [color    (:turn @board)
             king-pos (get-piece-pos (str (first color) "king"))]
         (is-check? color king-pos)))
   ([color king-pos] (let [pieces       (get-pieces-names (if (= color "white") "black" "white"))
-                          pieces-moves (apply concat (map get-piece-moves pieces))]
-                      (some #(= king-pos %) pieces-moves))))
+                          king-threats (map threathened-cells pieces)]
+                      (some #(= king-pos %) (flt king-threats)))))
 
-#_(is-check? "black" [3 6])
-
-
+;; (is-check? "black" [3 6])
 
 (defn is-checkmate? []
   (let [color       (:turn @board)

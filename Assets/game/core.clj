@@ -116,6 +116,7 @@
     (for [piece-name (get-pieces-names)]
       (spawn-piece! board piece-name))
     ))
+;; (game.data/is-valid-move? "wbishop" (mouse-position))
 
 (start-game nil)
 
