@@ -42,8 +42,6 @@
   (let [steps      2
         directions [[0 (if (= (:color piece) "white") 1 -1)]        ; forward
                     [0 (if (= (:color piece) "white") 2 -2)]        ; double forward
-                    [1 (if (= (:color piece) "white") 1 -1)]        ; diag right
-                    [-1 (if (= (:color piece) "white") 1 -1)]        ; diag left
                     ]]
     (trajs steps directions)))
 
@@ -84,6 +82,23 @@
                     [-2 -1]           ; left down
                     ]]
     (trajs steps directions)))
+
+(defmulti captures (fn [piece] (if (= (:type piece) "pawn") "pawn" "king")))
+
+(defmethod captures "pawn"
+  [piece]
+  (let [steps      2
+        directions [[1 (if (= (:color piece) "white") 1 -1)]        ; diag right
+                    [-1 (if (= (:color piece) "white") 1 -1)]        ; diag left
+                    ]]
+    (trajs steps directions)))
+
+(defmethod captures :default
+  [piece]
+  (trajectories piece)
+  )
+
+
 
 ;;; board
 (def board
@@ -129,6 +144,9 @@
   (let [piece (get-piece name)]
     (get piece :selected)))
 
+
+;;; get-piece-moves
+
 (defn abs [x]
   (if (> x 0) x (* -1 x)))
 
@@ -142,9 +160,16 @@
         is-legal-vertical?   (if advances-two? is-pawn-initial-pos? true)]
     (and is-vertical? is-legal-vertical?)))
 
+(declare is-check?)
+
+(defn legal-king-move? [name move]
+  (let [color (get-piece-color name)]
+    (if (= color (:turn @board))
+      (not (is-check? color move))
+      true)))
+
 #_(legal-pawn-move? "bpawn" [6 1])
 
-(declare legal-king-move?)
 
 (defn is-legal-move? [name [x y]]
   (and (not (contains? @board [x y]))
@@ -158,35 +183,43 @@
   (let [cell-color (:color (get @board cell))]
     (and (some? cell-color) (not= color cell-color))))
 
-
 ;; TODO pawn en-passant
 (defn does-piece-capture? [name cell]
   (let [piece-color (get-piece-color name)]
     (is-enemy-cell? piece-color cell)))
 
-(defn is-possible-move? [name cell]
-  (or (is-legal-move? name cell) (does-piece-capture? name cell)))
-
-(defn get-legal-moves [name traj]
-  "Trajectory is a sequence of moves in the same direction.
-We first sort it and then 'cut' it when it goes off the board or hits a piece."
+(defn cut-moves [name traj]
+  "Moves is empty cells the piece can move to. A sequence of legal moves"
   (let [moves       (sort-by #(+ (abs (first %)) (abs (second %))) traj)
-        legal-moves (take-while (fn [move] (is-possible-move? name move)) moves)]
+        legal-moves (take-while (fn [move] (is-legal-move? name move)) moves)]
     legal-moves))
 
-;; (get-legal-moves "white" [[7 3]])
+(defn cut-captures [name traj]
+  "Here we see if we capture an enemy in this trajectory"
+  (let [moves    (sort-by #(+ (abs (first %)) (abs (second %))) traj)
+        captures (filter (fn [move] (does-piece-capture? name move)) moves)]
+    (if (empty? captures) '() (first captures))))
 
 (defn add-xy [[x y] [x-offset y-offset]]
   [(+ x x-offset) (+ y y-offset)])
 
+(defn flt [s] (mapcat #(if (every? coll? %) (flt %) (list %)) s))
+
 (defn get-piece-moves [name]
   (let [[pos piece] (get-piece-map name)
-        trajs       (trajectories piece)
-        piece-trajs (map (fn [traj] (map (partial add-xy pos) traj)) trajs)
-        legal-moves (map (partial get-legal-moves name) piece-trajs)]
-    (apply concat legal-moves)))
+        piece-trajs (map (fn [traj] (map (partial add-xy pos) traj)) (trajectories piece))
+        piece-capts (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
+        legal-moves (map (partial cut-moves name) piece-trajs)
+        captures    (map (partial cut-captures name) piece-capts)]
+    (concat (flt legal-moves) (flt captures))
+    ;; legal-moves
+    )) ;; remove empty trajectories
 
-(trajectories (get-piece "wking"))
+;; (get-piece-moves "bking")
+;; (trajectories (get-piece "wking"))
+;; (captures (get-piece "wking"))
+
+
 ;; check, checkmate
 
 (defn is-check?
@@ -199,11 +232,7 @@ We first sort it and then 'cut' it when it goes off the board or hits a piece."
 
 #_(is-check? "black" [3 6])
 
-(defn legal-king-move? [name move]
-  (let [color (get-piece-color name)]
-    (if (= color (:turn @board))
-      (not (is-check? color move))
-      true)))
+
 
 (defn is-checkmate? []
   (let [color       (:turn @board)
@@ -214,9 +243,9 @@ We first sort it and then 'cut' it when it goes off the board or hits a piece."
 ;; interact with user selection
 
 ;; TODO unify with function above??
-;; (defn is-legal-move? [name cell]
-;;   (let [legal-moves (get-piece-moves name)]
-;;     (some #(= cell %) legal-moves)))
+(defn is-valid-move? [name cell]
+  (let [legal-moves (get-piece-moves name)]
+    (some #(= cell %) legal-moves)))
 
 #_(is-legal-move? "wbishop" [5 0])
 
