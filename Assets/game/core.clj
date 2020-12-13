@@ -5,7 +5,7 @@
         [hard.input])
   (:require [game.data :refer [get-pieces-names get-piece-pos get-piece-color get-piece-moves is-valid-move?
                                update-board! board-select! board-unselect! is-piece-selected? any-piece-selected?
-                               does-piece-capture? get-piece-at-pos is-pieces-turn? update-board-turn!]] :reload)
+                               does-piece-capture? get-piece-at-pos is-pieces-turn? has-legal-moves?]] :reload)
   (:import
    Physics
    MeshRenderer
@@ -31,9 +31,7 @@
 
 (defn spawn-cell! [go [x y]]
   (let [highcell (clone! "highcell")]
-    (position! highcell (v3 (+ x offset) 0.0001 (+ y offset)))
-    ;; (child+ go highcell)
-    ))
+    (position! highcell (v3 (+ x offset) 0.0001 (+ y offset)))))
 
 (defn highlight-cells! [go]
   (let [legal-moves (game.data/get-piece-moves (.name go))]
@@ -41,10 +39,10 @@
 
 (defn destroy-highcells! []
   (destroy! (every "highcell")))
-#_(destroy-highcells!)
 
 (defn select-piece! [go _]
-  (when (and (mouse-down?) (is-pieces-turn? (.name go)))
+  (when (and (mouse-down?) (is-pieces-turn? (.name go)) ;; (has-legal-moves? (.name go))
+             )
     (let [[mouse-x mouse-y] (mouse-position)
           go-x              (int (.x (.position (.transform go))))
           go-y              (int (.z (.position (.transform go))))]
@@ -60,9 +58,6 @@
     (destroy-highcells!)
     (board-unselect! (.name go))
     ))
-
-;; (board-unselect! "wbishop")
-;; (is-piece-selected? "wbishop")
 
 ;;; move
 (defn move-go! [go x y]
@@ -84,14 +79,7 @@
         (hide-highlight! go)
         (destroy-highcells!)
         (board-unselect! name)
-        (update-board-turn!)
         ))))
-
-#_(destroy! (object-named (get-piece-at-pos (mouse-position))))
-
-#_(game.data/is-legal-move? "wbishop" (mouse-position))
-
-#_(hook (the "wbishop") :update :move)
 
 ;;; spawn
 (defn spawn-piece! [board piece-name]
@@ -116,7 +104,6 @@
     (for [piece-name (get-pieces-names)]
       (spawn-piece! board piece-name))
     ))
-;; (game.data/is-valid-move? "wbishop" (mouse-position))
 
 (start-game nil)
 

@@ -58,11 +58,14 @@ When the player clicks on a destination cell, we update the position of the piec
 
 ** TODO missing
 - turn √
+- promotion
 - end of game
 - castling
 - empassant
 - pawn should capture to the side √
-- promotion
+- when king under check, pieces can only move if check is disabled
+  + move updates board (potentially removing one enemy piece)
+  + board needs to be checked for check
 * Reinforcement Learning
 - AlphaZero in Unity: https://github.com/SSSxCCC/AlphaZero-In-Unity
 - DeepMind paper on AlphaZero: https://arxiv.org/pdf/1712.01815v1.pdf

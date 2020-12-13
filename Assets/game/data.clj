@@ -1,8 +1,8 @@
 (ns game.data
-  (:require [arcadia.core :refer [log]]))
+  ;; (:require [arcadia.core :refer [log]])
+  )
 
 (def size 8)
-
 
 ;; TODO multimethod to get legal moves? default is current legal-move, more conditions for pawn and king
 
@@ -118,22 +118,24 @@
 
 (defn get-pieces-names
   ([] (map :name (vals (dissoc @board :turn))))
-  ([color] (map :name (vals (filter (fn [[k v]] (= (:color v) color)) @board)))))
+  ([color] (get-pieces-names color @board))
+  ([color board] (map :name (vals (filter (fn [[k v]] (= (:color v) color)) board)))))
 
-(defn get-piece-map [name]
-  (first (filter (fn [[k v]] (= (:name v) name)) @board))) ; TODO why do we need first?
+(defn get-piece-map
+  ([name] (get-piece-map name @board))
+  ([name board] (first (filter (fn [[k v]] (= (:name v) name)) board)))) ; TODO why do we need first?
 
-(defn get-piece [name]
-  (val (get-piece-map name)))
+(defn get-piece
+  ([name] (get-piece name @board))
+  ([name board] (val (get-piece-map name board))))
 
-(defn get-piece-pos [name]
-  (key (get-piece-map name)))
+(defn get-piece-pos
+  ([name] (get-piece-pos name @board))
+  ([name board] (key (get-piece-map name board))))
 
-(defn get-piece-at-pos [pos]
-  (:name (get @board pos)))
-
-(defn get-piece-color [name]
-  (:color (get-piece name)))
+(defn get-piece-color
+  ([name] (get-piece-color name @board))
+  ([name board] (:color (get-piece name board))))
 
 #_(get-pieces-of-color "white")
 
@@ -150,33 +152,25 @@
 (defn abs [x]
   (if (> x 0) x (* -1 x)))
 
-(defn legal-pawn-move? [name [to-x to-y]]
+(defn legal-pawn-move? [name [to-x to-y] board]
   "Pawns can only move by 2 if it is in initial position"
-  (let [[from-x from-y]      (get-piece-pos name)
-        color                (get-piece-color name)
+  (let [[from-x from-y]      (get-piece-pos name board)
+        color                (get-piece-color name board)
         advances-two?        (= (abs (- to-y from-y)) 2)
         is-pawn-initial-pos? (if (= color "white") (= from-y 1) (= from-y 6))]
     (if advances-two? is-pawn-initial-pos? true)))
 
-(declare is-check?)
-
-(defn legal-king-move? [name move]
-  (let [color (get-piece-color name)]
-    (if (= color (:turn @board))
-      (not (is-check? color move))
-      true)))
-
-;; (is-check? "white" move)
-
 #_(legal-pawn-move? "bpawn" [6 1])
 ;; (is-legal-move? "wbishop" [6 1])
 
-(defn is-legal-move? [name [x y]]
-  (and (not (contains? @board [x y]))
+(declare legal-king-move?)
+
+(defn is-legal-move? [name [x y] board]
+  (and (not (contains? board [x y]))
        (>= x 0) (< x  size)
        (>= y 0) (< y size)
-       (if (re-find #"pawn" name) (legal-pawn-move? name [x y]) true)
-       (if (re-find #"king" name) (legal-king-move? name [x y]) true)
+       (if (re-find #"pawn" name) (legal-pawn-move? name [x y] board) true)
+       (if (re-find #"king" name) (legal-king-move? name [x y] board) true)
        ))
 
 (defn is-enemy-cell? [color cell]
@@ -188,11 +182,10 @@
   (let [piece-color (get-piece-color name)]
     (is-enemy-cell? piece-color cell)))
 
-(defn cut-traj [name traj]
+(defn cut-traj
   "Keep the first part of the trajectory until we hit a piece."
-  (take-while (fn [move] (is-legal-move? name move)) traj))
-
-;; (trajectories (get-piece "wbishop"))
+  ([name traj] (cut-traj name traj @board))
+  ([name traj board] (take-while (fn [move] (is-legal-move? name move board)) traj)))
 
 (defn cut-captures [name traj]
   "Returns first enemy captured in trajectory"
@@ -213,49 +206,9 @@
         legal-captures (map (partial cut-captures name) maybe-captures)]
     (concat (flt legal-moves) (flt legal-captures))))
 
-;; (get-piece-moves "wbishop")
-;; (trajectories (get-piece "wking"))
-;; (captures (get-piece "wking"))
+;; (get-piece-moves "wking")
 
-;; check, checkmate
-
-(defn threathened-cells [name]
-  (let [[pos piece]    (get-piece-map name)
-        maybe-captures (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
-        legal-captures (map (partial cut-traj name) maybe-captures)]
-    legal-captures))
-
-;; (threathened-cells "wbishop")
-
-(defn is-check?
-  ([] (let [color    (:turn @board)
-            king-pos (get-piece-pos (str (first color) "king"))]
-        (is-check? color king-pos)))
-  ([color king-pos] (let [pieces       (get-pieces-names (if (= color "white") "black" "white"))
-                          king-threats (map threathened-cells pieces)]
-                      (some #(= king-pos %) (flt king-threats)))))
-
-;; (is-check? "black" [3 6])
-
-(defn is-checkmate? []
-  (let [color       (:turn @board)
-        king-moves  (get-piece-moves (str (first color) "king"))
-        legal-moves (filter (partial legal-king-move? color) king-moves)]
-    (= 0 (count legal-moves))))
-
-;; interact with user selection
-
-;; TODO unify with function above??
-(defn is-valid-move? [name cell]
-  (let [legal-moves (get-piece-moves name)]
-    (some #(= cell %) legal-moves)))
-
-#_(is-legal-move? "wbishop" [5 0])
-
-(defn any-piece-selected? []
-  (reduce (fn [res [pos piece]] (or res (get piece :selected))) false @board))
-
-;; update board
+;; user selection
 
 (defn board-select! [name]
   (let [[pos piece] (get-piece-map name)]
@@ -265,13 +218,76 @@
   (let [[pos piece] (get-piece-map name)]
     (swap! board assoc pos (dissoc piece :selected))))
 
-(defn update-board! [name new-pos]
-  (let [[previous-pos piece] (get-piece-map name)]
-    (swap! board dissoc previous-pos)
-    (swap! board assoc new-pos piece)))
+;; TODO unify with function above??
+(defn is-valid-move? [name cell]
+  (let [legal-moves (get-piece-moves name)]
+    (some #(= cell %) legal-moves)))
 
-(defn update-board-turn! []
-  (let [new-color (if (= (:turn @board) "white") "black" "white")]
+(defn get-piece-at-pos [pos]
+  (:name (get @board pos)))
+
+#_(is-valid-move? "wbishop" [5 0])
+
+(defn any-piece-selected? []
+  (reduce (fn [res [pos piece]] (or res (get piece :selected))) false @board))
+
+;; TODO
+(defn has-legal-moves? [name]
+  true
+  )
+
+;; update board
+
+(defn update-board! [name new-pos]
+  (let [[previous-pos piece] (get-piece-map name)
+        new-color (if (= (:turn @board) "white") "black" "white")]
+    (swap! board dissoc previous-pos)
+    (swap! board assoc new-pos piece)
     (swap! board assoc :turn new-color)))
+
+(defn update-board [name new-pos]
+  (let [[previous-pos piece] (get-piece-map name)
+        new-color (if (= (:turn @board) "white") "black" "white")]
+    (-> (dissoc @board previous-pos)
+        (assoc new-pos piece)
+        ;; (assoc :turn new-color)
+        )))
+
 #_(update-board-turn!)
 
+;; check, checkmate
+
+(defn threathened-cells [board name]
+  (let [[pos piece]    (get-piece-map name board)
+        maybe-captures (map (fn [traj] (map (partial add-xy pos) traj)) (captures piece))
+        legal-captures (map (fn [traj] (cut-traj name traj board)) maybe-captures)]
+    legal-captures))
+
+;; (threathened-cells @board "wbishop")
+
+(defn is-move-check? [name move]
+  (let [new-board    (update-board name move)
+        king-pos     (get-piece-pos (str (first (:turn new-board)) "king"))
+        enemy-color  (if (= (:turn new-board) "white") "black" "white")
+        pieces       (get-pieces-names enemy-color new-board)
+        king-threats (map (partial threathened-cells new-board) pieces)
+        ]
+    (some #(= king-pos %) (flt king-threats))
+    ))
+
+;; (is-move-check? "wking" [7 0])
+
+(defn legal-king-move? [name new-king-pos board]
+  (let [color (get-piece-color name)]
+    (if (= color (:turn board))
+      (not (is-move-check? name new-king-pos))
+      true)))
+
+;; (legal-king-move? "wking" [6 0] @board)
+
+(defn is-checkmate? []
+  (let [color       (:turn @board)
+        name (str (first color) "king")
+        king-moves  (get-piece-moves name)
+        legal-moves (filter (fn [move] (legal-king-move? name move board)) king-moves)]
+    (= 0 (count legal-moves))))
